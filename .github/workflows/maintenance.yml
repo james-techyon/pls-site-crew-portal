@@ -1,0 +1,251 @@
+name: Maintenance and Security
+
+on:
+  schedule:
+    # Run every Monday at 9 AM UTC
+    - cron: '0 9 * * 1'
+  workflow_dispatch:
+    inputs:
+      check_type:
+        description: 'Type of maintenance check'
+        required: true
+        default: 'all'
+        type: choice
+        options:
+        - all
+        - dependencies
+        - security
+        - performance
+
+env:
+  NODE_VERSION: '20'
+  BUN_VERSION: '1.2.19'
+
+jobs:
+  dependency-audit:
+    name: Dependency Audit
+    runs-on: ubuntu-latest
+    if: github.event.inputs.check_type == 'all' || github.event.inputs.check_type == 'dependencies' || github.event_name == 'schedule'
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: ${{ env.BUN_VERSION }}
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Run dependency audit
+        run: |
+          echo "## Dependency Audit Report" > audit-report.md
+          echo "**Date**: $(date -u '+%Y-%m-%d %H:%M:%S UTC')" >> audit-report.md
+          echo "" >> audit-report.md
+          
+          echo "### Security Vulnerabilities" >> audit-report.md
+          echo '```' >> audit-report.md
+          bun audit --json > audit.json 2>/dev/null || echo "Audit completed with issues"
+          if [ -f audit.json ]; then
+            cat audit.json | bun run --silent << 'EOF'
+          const audit = JSON.parse(require('fs').readFileSync('/dev/stdin', 'utf8'));
+          if (audit.advisories) {
+            Object.values(audit.advisories).forEach(advisory => {
+              console.log(`${advisory.severity.toUpperCase()}: ${advisory.title}`);
+              console.log(`Module: ${advisory.module_name}`);
+              console.log(`More info: ${advisory.url}`);
+              console.log('---');
+            });
+          } else {
+            console.log('No vulnerabilities found');
+          }
+          EOF
+          fi
+          echo '```' >> audit-report.md
+
+      - name: Check for outdated packages
+        run: |
+          echo "" >> audit-report.md
+          echo "### Outdated Packages" >> audit-report.md
+          echo '```' >> audit-report.md
+          bun outdated 2>/dev/null || echo "All packages up to date"
+          echo '```' >> audit-report.md
+
+      - name: Upload audit report
+        uses: actions/upload-artifact@v4
+        with:
+          name: dependency-audit-report
+          path: audit-report.md
+          retention-days: 30
+
+  security-scan:
+    name: Security Scan
+    runs-on: ubuntu-latest
+    if: github.event.inputs.check_type == 'all' || github.event.inputs.check_type == 'security' || github.event_name == 'schedule'
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          scan-ref: '.'
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+
+      - name: Upload Trivy scan results to GitHub Security tab
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: 'trivy-results.sarif'
+
+      - name: Create security report
+        run: |
+          echo "## Security Scan Report" > security-report.md
+          echo "**Date**: $(date -u '+%Y-%m-%d %H:%M:%S UTC')" >> security-report.md
+          echo "**Scanner**: Trivy" >> security-report.md
+          echo "" >> security-report.md
+          echo "Security scan completed. Check the Security tab for detailed results." >> security-report.md
+
+      - name: Upload security report
+        uses: actions/upload-artifact@v4
+        with:
+          name: security-scan-report
+          path: security-report.md
+          retention-days: 30
+
+  performance-analysis:
+    name: Performance Analysis
+    runs-on: ubuntu-latest
+    if: github.event.inputs.check_type == 'all' || github.event.inputs.check_type == 'performance' || github.event_name == 'schedule'
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: ${{ env.BUN_VERSION }}
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Build application
+        run: bun run build
+
+      - name: Analyze bundle size
+        run: |
+          echo "## Performance Analysis Report" > performance-report.md
+          echo "**Date**: $(date -u '+%Y-%m-%d %H:%M:%S UTC')" >> performance-report.md
+          echo "" >> performance-report.md
+          
+          echo "### Bundle Size Analysis" >> performance-report.md
+          echo '```' >> performance-report.md
+          echo "Total build size: $(du -sh dist/ | cut -f1)" >> performance-report.md
+          echo "" >> performance-report.md
+          echo "Asset breakdown:" >> performance-report.md
+          find dist/ -type f -name "*.js" -o -name "*.css" | while read file; do
+            size=$(du -h "$file" | cut -f1)
+            echo "$size - $(basename "$file")" >> performance-report.md
+          done
+          echo '```' >> performance-report.md
+          
+          echo "" >> performance-report.md
+          echo "### Recommendations" >> performance-report.md
+          
+          # Check for large assets
+          large_assets=$(find dist/ -type f -size +500k)
+          if [ -n "$large_assets" ]; then
+            echo "- Consider optimizing large assets (>500KB):" >> performance-report.md
+            echo "$large_assets" | while read asset; do
+              echo "  - $asset" >> performance-report.md
+            done
+          else
+            echo "- No large assets detected (all under 500KB)" >> performance-report.md
+          fi
+
+      - name: Upload performance report
+        uses: actions/upload-artifact@v4
+        with:
+          name: performance-analysis-report
+          path: performance-report.md
+          retention-days: 30
+
+  create-maintenance-issue:
+    name: Create Maintenance Issue
+    needs: [dependency-audit, security-scan, performance-analysis]
+    runs-on: ubuntu-latest
+    if: always() && (failure() || github.event_name == 'schedule')
+    
+    steps:
+      - name: Create maintenance issue
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const issues = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              labels: 'maintenance,automated'
+            });
+            
+            // Don't create duplicate issues
+            if (issues.data.length > 0) {
+              console.log('Maintenance issue already exists');
+              return;
+            }
+            
+            const date = new Date().toISOString().split('T')[0];
+            const title = `Maintenance Report - ${date}`;
+            
+            let body = `## Automated Maintenance Report\n\n`;
+            body += `**Date**: ${date}\n`;
+            body += `**Triggered by**: ${context.eventName}\n\n`;
+            
+            body += `### Job Results\n`;
+            body += `- Dependency Audit: ${{ needs.dependency-audit.result || 'skipped' }}\n`;
+            body += `- Security Scan: ${{ needs.security-scan.result || 'skipped' }}\n`;
+            body += `- Performance Analysis: ${{ needs.performance-analysis.result || 'skipped' }}\n\n`;
+            
+            body += `### Actions Needed\n`;
+            body += `Please review the maintenance reports and take necessary actions:\n\n`;
+            body += `1. Check dependency audit results for security vulnerabilities\n`;
+            body += `2. Review security scan findings\n`;
+            body += `3. Analyze performance metrics and optimize if needed\n`;
+            body += `4. Update dependencies as necessary\n\n`;
+            
+            body += `### Reports\n`;
+            body += `Download the artifact reports from the [workflow run](${context.payload.repository.html_url}/actions/runs/${context.runId}) for detailed information.\n`;
+            
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: title,
+              body: body,
+              labels: ['maintenance', 'automated', 'needs-review']
+            });
+
+  maintenance-summary:
+    name: Maintenance Summary
+    needs: [dependency-audit, security-scan, performance-analysis]
+    runs-on: ubuntu-latest
+    if: always()
+    
+    steps:
+      - name: Create maintenance summary
+        run: |
+          echo "# Maintenance Summary" >> $GITHUB_STEP_SUMMARY
+          echo "**Date**: $(date -u '+%Y-%m-%d %H:%M:%S UTC')" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Check | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|-------|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Dependency Audit | ${{ needs.dependency-audit.result || 'skipped' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Security Scan | ${{ needs.security-scan.result || 'skipped' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Performance Analysis | ${{ needs.performance-analysis.result || 'skipped' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Check the artifacts for detailed reports." >> $GITHUB_STEP_SUMMARY

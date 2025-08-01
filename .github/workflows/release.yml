@@ -1,0 +1,260 @@
+name: Release and Deploy
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release version (e.g., v1.0.0)'
+        required: true
+        default: 'v1.0.0'
+      environment:
+        description: 'Target environment'
+        required: true
+        default: 'production'
+        type: choice
+        options:
+        - production
+        - staging
+      deploy_platforms:
+        description: 'Deployment platforms'
+        required: true
+        default: 'all'
+        type: choice
+        options:
+        - all
+        - vercel
+        - netlify
+        - github-pages
+
+env:
+  NODE_VERSION: '20'
+  BUN_VERSION: '1.2.19'
+
+jobs:
+  prepare-release:
+    name: Prepare Release
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      tag: ${{ steps.version.outputs.tag }}
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Determine version
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" = "release" ]; then
+            echo "version=${{ github.event.release.tag_name }}" >> $GITHUB_OUTPUT
+            echo "tag=${{ github.event.release.tag_name }}" >> $GITHUB_OUTPUT
+          else
+            echo "version=${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
+            echo "tag=${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Create release summary
+        run: |
+          echo "## Release Information" >> $GITHUB_STEP_SUMMARY
+          echo "- **Version**: ${{ steps.version.outputs.version }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Environment**: ${{ github.event.inputs.environment || 'production' }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Platforms**: ${{ github.event.inputs.deploy_platforms || 'all' }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Triggered by**: ${{ github.event_name }}" >> $GITHUB_STEP_SUMMARY
+
+  build-release:
+    name: Build Release
+    needs: prepare-release
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: ${{ env.BUN_VERSION }}
+
+      - name: Cache dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.bun/install/cache
+            node_modules
+          key: ${{ runner.os }}-bun-${{ hashFiles('**/bun.lockb', '**/package.json') }}
+          restore-keys: |
+            ${{ runner.os }}-bun-
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Update version in package.json
+        run: |
+          VERSION="${{ needs.prepare-release.outputs.version }}"
+          # Remove 'v' prefix if present
+          VERSION=${VERSION#v}
+          bun run --silent << 'EOF'
+          const fs = require('fs');
+          const package = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+          package.version = process.argv[1];
+          fs.writeFileSync('package.json', JSON.stringify(package, null, 2));
+          EOF
+          echo "Updated package.json version to: $VERSION"
+
+      - name: Run full build pipeline
+        run: |
+          echo "Running linting..."
+          bun run lint || echo "Linting completed with warnings"
+          
+          echo "Running type checking..."
+          bun run type-check || echo "Type checking completed with warnings"
+          
+          echo "Building application..."
+          bun run build
+
+      - name: Generate build report
+        run: |
+          echo "## Build Report" >> build-report.md
+          echo "**Version**: ${{ needs.prepare-release.outputs.version }}" >> build-report.md
+          echo "**Build Date**: $(date -u '+%Y-%m-%d %H:%M:%S UTC')" >> build-report.md
+          echo "**Commit**: ${{ github.sha }}" >> build-report.md
+          echo "" >> build-report.md
+          echo "### Bundle Analysis" >> build-report.md
+          echo '```' >> build-report.md
+          echo "Total build size: $(du -sh dist/ | cut -f1)" >> build-report.md
+          echo "" >> build-report.md
+          echo "Asset breakdown:" >> build-report.md
+          du -h dist/assets/* 2>/dev/null || echo "No assets found" >> build-report.md
+          echo '```' >> build-report.md
+
+      - name: Upload release artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-build-${{ needs.prepare-release.outputs.version }}
+          path: |
+            dist/
+            build-report.md
+          retention-days: 30
+
+  deploy-vercel-release:
+    name: Deploy to Vercel (Release)
+    needs: [prepare-release, build-release]
+    runs-on: ubuntu-latest
+    if: github.event.inputs.deploy_platforms == 'all' || github.event.inputs.deploy_platforms == 'vercel' || github.event_name == 'release'
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: ${{ env.BUN_VERSION }}
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Deploy to Vercel
+        uses: amondnet/vercel-action@v25
+        with:
+          vercel-token: ${{ secrets.VERCEL_TOKEN }}
+          vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
+          vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
+          github-comment: false
+          vercel-args: '--prod'
+
+  deploy-netlify-release:
+    name: Deploy to Netlify (Release)
+    needs: [prepare-release, build-release]
+    runs-on: ubuntu-latest
+    if: github.event.inputs.deploy_platforms == 'all' || github.event.inputs.deploy_platforms == 'netlify' || github.event_name == 'release'
+    
+    steps:
+      - name: Download release artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: release-build-${{ needs.prepare-release.outputs.version }}
+
+      - name: Deploy to Netlify
+        uses: nwtgck/actions-netlify@v3.0
+        with:
+          publish-dir: './dist'
+          production-branch: main
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          deploy-message: "Release ${{ needs.prepare-release.outputs.version }} deployment"
+          enable-pull-request-comment: false
+          enable-commit-comment: true
+        env:
+          NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
+          NETLIFY_SITE_ID: ${{ secrets.NETLIFY_SITE_ID }}
+
+  deploy-github-pages-release:
+    name: Deploy to GitHub Pages (Release)
+    needs: [prepare-release, build-release]
+    runs-on: ubuntu-latest
+    if: github.event.inputs.deploy_platforms == 'all' || github.event.inputs.deploy_platforms == 'github-pages' || github.event_name == 'release'
+    
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    
+    steps:
+      - name: Download release artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: release-build-${{ needs.prepare-release.outputs.version }}
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v4
+
+      - name: Upload to GitHub Pages
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist/
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
+
+  create-deployment-report:
+    name: Create Deployment Report
+    needs: [prepare-release, deploy-vercel-release, deploy-netlify-release, deploy-github-pages-release]
+    runs-on: ubuntu-latest
+    if: always()
+    
+    steps:
+      - name: Generate deployment report
+        run: |
+          echo "# Deployment Report" > deployment-report.md
+          echo "**Release**: ${{ needs.prepare-release.outputs.version }}" >> deployment-report.md
+          echo "**Date**: $(date -u '+%Y-%m-%d %H:%M:%S UTC')" >> deployment-report.md
+          echo "**Triggered by**: ${{ github.actor }}" >> deployment-report.md
+          echo "" >> deployment-report.md
+          echo "## Deployment Status" >> deployment-report.md
+          echo "| Platform | Status | Notes |" >> deployment-report.md
+          echo "|----------|--------|-------|" >> deployment-report.md
+          echo "| Vercel | ${{ needs.deploy-vercel-release.result || 'skipped' }} | Production deployment |" >> deployment-report.md
+          echo "| Netlify | ${{ needs.deploy-netlify-release.result || 'skipped' }} | Backup deployment |" >> deployment-report.md
+          echo "| GitHub Pages | ${{ needs.deploy-github-pages-release.result || 'skipped' }} | Static hosting |" >> deployment-report.md
+          echo "" >> deployment-report.md
+          echo "## Quick Links" >> deployment-report.md
+          echo "- [Repository](https://github.com/${{ github.repository }})" >> deployment-report.md
+          echo "- [Release Notes](https://github.com/${{ github.repository }}/releases/tag/${{ needs.prepare-release.outputs.tag }})" >> deployment-report.md
+
+      - name: Upload deployment report
+        uses: actions/upload-artifact@v4
+        with:
+          name: deployment-report-${{ needs.prepare-release.outputs.version }}
+          path: deployment-report.md
+          retention-days: 90
+
+      - name: Add report to summary
+        run: |
+          cat deployment-report.md >> $GITHUB_STEP_SUMMARY

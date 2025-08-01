@@ -1,135 +1,263 @@
-# Scout Vite Template
+# Prestige Labor Solutions - Contractor Portal
 
-This is a [Vite](https://vite.dev) project bootstrapped with React + TypeScript and configured with TailwindCSS v4 and ShadCN UI.
+![Deploy Status](https://github.com/james-techyon/pls-site-crew-portal/actions/workflows/deploy.yml/badge.svg)
+![PR Checks](https://github.com/james-techyon/pls-site-crew-portal/actions/workflows/pr-check.yml/badge.svg)
+![Maintenance](https://github.com/james-techyon/pls-site-crew-portal/actions/workflows/maintenance.yml/badge.svg)
 
-## Getting Started
+A modern, professional contractor intake form built with React, TypeScript, and TailwindCSS, featuring automated CI/CD deployment pipeline and comprehensive form validation.
 
-First, run the development server:
+## 🚀 Features
 
+- **4-Step Process**: Personal Info → Eligible Positions → Additional Info → Review & Submit
+- **Professional PLS Branding**: Official logo, colors (#ffb700), and animations
+- **Enhanced UX**: Glassmorphism effects, smooth animations, responsive design
+- **Form Validation**: Real-time validation with clear error states
+- **Accessibility**: Screen reader support and keyboard navigation
+- **Modern Tech Stack**: React 19, TypeScript, TailwindCSS V4, ShadCN UI
+- **Automated Deployment**: GitHub Actions CI/CD pipeline with multi-platform deployment
+
+## 🏗️ Tech Stack
+
+- **Frontend**: React 19, TypeScript
+- **Styling**: TailwindCSS V4, ShadCN UI Components
+- **Build Tool**: Vite
+- **Package Manager**: Bun
+- **Deployment**: GitHub Actions, Vercel, Netlify, GitHub Pages
+- **Forms**: React Hook Form with Zod validation
+- **Icons**: Lucide React
+- **Animations**: Framer Motion
+
+## 🛠️ Getting Started
+
+### Prerequisites
+
+- [Bun](https://bun.sh/) (recommended) or Node.js 20+
+- Git
+
+### Installation
+
+1. Clone the repository:
+```bash
+git clone https://github.com/james-techyon/pls-site-crew-portal.git
+cd pls-site-crew-portal
+```
+
+2. Install dependencies:
+```bash
+bun install
+```
+
+3. Start the development server:
 ```bash
 bun dev
 ```
 
-Open [http://localhost:5173](http://localhost:5173) with your browser to see the result.
+4. Open [http://localhost:5173](http://localhost:5173) in your browser.
 
-You can start editing the page by modifying `src/App.tsx`. The page auto-updates as you edit the file.
+### Available Scripts
 
-## Project Configuration
+```bash
+# Development
+bun dev                 # Start development server
+bun build              # Build for production
+bun preview            # Preview production build
+bun serve              # Serve production build
 
-### Package Management
+# Code Quality
+bun lint               # Run ESLint
+bun lint:fix           # Fix ESLint issues
+bun type-check         # Run TypeScript type checking
+bun check              # Run both type-check and lint
 
-This project uses [Bun](https://bun.sh/) as the package manager:
-
-- Install dependencies: `bun add <package-name>`
-- Run scripts: `bun <script-name>`
-- Manage dev dependencies: `bun add -d <package-name>`
-
-### Theme Customization
-
-The project uses Tailwind CSS V4 with a theme defined in:
-
-- `src/index.css` - For CSS variables including colors in OKLCH format and custom theming
-- Tailwind V4 uses the new `@theme` directive for configuration
-
-### ShadCN UI Components
-
-This project uses [ShadCN UI](https://ui.shadcn.com) for styled components. The components are incorporated directly into the codebase (not as dependencies), making them fully customizable. All components have been installed:
-
-- accordion
-- alert-dialog
-- alert
-- aspect-ratio
-- avatar
-- badge
-- breadcrumb
-- button
-- calendar
-- card
-- carousel
-- chart
-- checkbox
-- collapsible
-- command
-- context-menu
-- dialog
-- drawer
-- dropdown-menu
-- form
-- hover-card
-- input-otp
-- input
-- label
-- menubar
-- navigation-menu
-- pagination
-- popover
-- progress
-- radio-group
-- scroll-area
-- select
-- separator
-- sheet
-- skeleton
-- slider
-- sonner
-- switch
-- table
-- tabs
-- textarea
-- toast
-- toggle-group
-- toggle
-
-### Icon Library
-
-[Lucide React](https://lucide.dev/) is the preferred icon library for this project, as specified in components.json. Always use Lucide icons to maintain consistency:
-
-```tsx
-import { ArrowRight } from "lucide-react";
-
-// Use in components
-<Button>
-  <span>Click me</span>
-  <ArrowRight />
-</Button>;
+# Utilities
+bun clean              # Clean dist directory
 ```
 
-### Font Configuration
+## 🚀 Deployment
 
-This project uses Google Fonts with:
+This project features a comprehensive CI/CD pipeline with automated deployment to multiple platforms.
 
-- Inter (sans-serif)
-- Playfair Display (serif)
+### Automated Deployment Pipeline
 
-The font is imported via Google Fonts CDN in `src/index.css` and configured in the Tailwind theme:
+- **Main Branch**: Automatically deploys to production on push to `main`
+- **Pull Requests**: Runs tests, linting, and creates preview deployments
+- **Releases**: Handles versioning and multi-platform deployment
+- **Maintenance**: Weekly security scans and dependency audits
+
+### Deployment Platforms
+
+1. **Vercel** (Primary) - Fast, global CDN deployment
+2. **Netlify** (Backup) - Alternative hosting with form handling
+3. **GitHub Pages** (Static) - Free static hosting option
+
+### Quick Setup
+
+1. **Automated Setup**:
+```bash
+node scripts/setup-deployment.js
+```
+
+2. **Manual Setup**: 
+   - Follow the [Deployment Guide](.github/DEPLOYMENT.md)
+   - Add required secrets to GitHub repository settings
+
+### Required GitHub Secrets
+
+```bash
+# Vercel
+VERCEL_TOKEN=your_vercel_token
+VERCEL_ORG_ID=your_vercel_org_id
+VERCEL_PROJECT_ID=your_vercel_project_id
+
+# Netlify
+NETLIFY_AUTH_TOKEN=your_netlify_auth_token
+NETLIFY_SITE_ID=your_netlify_site_id
+```
+
+## 📝 Form Structure
+
+### Step 1: Personal Information
+- Basic contact details
+- Emergency contact information
+- Employment preferences
+
+### Step 2: Eligible Positions
+Expandable sections for specialization areas:
+- **Audio**: Sound engineering, mixing, equipment operation
+- **Video**: Camera operation, editing, live streaming
+- **Lighting**: Design, programming, equipment setup
+- **Management**: Project coordination, team leadership
+- **Assist**: General support, equipment handling
+
+### Step 3: Additional Information
+- Portfolio and work samples
+- Transportation and equipment
+- Availability and scheduling
+- Special skills and certifications
+
+### Step 4: Review & Submit
+- Form validation summary
+- Data review and confirmation
+- Submission handling
+
+## 🎨 Design System
+
+### Colors (PLS Branding)
+- **Primary**: `#ffb700` (Prestige Gold)
+- **Background**: `#0a0a0a` (Deep Black)
+- **Text**: `#ffffff` (White)
+- **Accent**: Various opacity levels of primary color
+
+### Typography
+- **Headings**: Inter (sans-serif)
+- **Body**: Inter (sans-serif)
+- **Monospace**: JetBrains Mono
+
+### Animations
+- Glassmorphism effects with backdrop blur
+- Smooth transitions and micro-interactions
+- Animated background grid
+- Logo glow effects
+- Form element focus animations
+
+## 🔧 Configuration
+
+### Environment Variables
+
+```bash
+NODE_ENV=production
+BASE_URL=/                 # or /repo-name/ for GitHub Pages
+```
+
+### Tailwind Configuration
+
+The project uses TailwindCSS V4 with custom theme configuration in `src/index.css`:
 
 ```css
-@import url("https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&display=swap");
-@import url("https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400..900;1,400..900&display=swap");
-
 @theme inline {
-  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
-  --font-serif: "Playfair Display", ui-serif, Georgia, serif;
+  --color-primary: oklch(0.78 0.18 58); /* #ffb700 */
+  --color-background: oklch(0.04 0 0);  /* #0a0a0a */
+  /* ... more theme variables */
 }
 ```
 
-To change or update fonts:
+### ShadCN UI Components
 
-1. Update the Google Fonts import in `src/index.css`
-2. Modify the `--font-sans` variable in the `@theme` directive
+All ShadCN UI components are pre-installed and customized for the PLS brand:
+- Form components with enhanced styling
+- Accessible form controls
+- Custom animations and transitions
+- Brand-consistent color scheme
 
-## Build and Deploy
+## 📱 Responsive Design
 
-Build the project:
+The form is fully responsive and optimized for:
+- **Desktop**: Full-featured experience with animations
+- **Tablet**: Touch-friendly interface with optimized layouts
+- **Mobile**: Streamlined forms with simplified navigation
 
-```bash
-bun run build
-```
+## 🛡️ Security & Quality
 
-Preview the production build:
+### Automated Checks
+- **Security Scanning**: Weekly Trivy vulnerability scans
+- **Dependency Auditing**: Automated npm/bun audit checks
+- **Code Quality**: ESLint and TypeScript strict mode
+- **Performance**: Bundle size analysis and optimization
 
-```bash
-bun run preview
-```
+### Accessibility
+- WCAG 2.1 AA compliance
+- Screen reader support
+- Keyboard navigation
+- Focus management
+- Color contrast compliance
 
-The built files will be in the `dist` directory, ready for deployment to any static hosting service.
+## 📊 Performance
+
+### Optimization Features
+- Code splitting and lazy loading
+- Image optimization
+- Bundle size monitoring
+- Performance budgets
+- CDN deployment
+
+### Metrics Monitoring
+- Bundle analysis on every build
+- Performance reports in CI/CD
+- Automated optimization recommendations
+
+## 🤝 Contributing
+
+1. Fork the repository
+2. Create a feature branch: `git checkout -b feature/amazing-feature`
+3. Commit changes: `git commit -m 'Add amazing feature'`
+4. Push to branch: `git push origin feature/amazing-feature`
+5. Open a Pull Request
+
+### Development Guidelines
+- Follow TypeScript strict mode
+- Use conventional commit messages
+- Ensure all tests pass
+- Maintain 100% TypeScript coverage
+- Follow accessibility best practices
+
+## 📄 License
+
+This project is proprietary to Prestige Labor Solutions.
+
+## 🔗 Links
+
+- **Production**: [Deployed App URL]
+- **Staging**: [Staging URL]
+- **Documentation**: [Deployment Guide](.github/DEPLOYMENT.md)
+- **Issues**: [GitHub Issues](https://github.com/james-techyon/pls-site-crew-portal/issues)
+
+## 📞 Support
+
+For technical support or questions:
+- Create an issue on GitHub
+- Contact the development team
+- Check the deployment documentation
+
+---
+
+**Built with ❤️ by the PLS Development Team**
